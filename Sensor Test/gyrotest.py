@@ -2,6 +2,7 @@
 """
 Released under the MIT License
 Copyright 2015 MrTijn/Tijndagamer
+Modified by Aaron Geller
 """
 
 # Import the MPU6050 class from the MPU6050.py file
