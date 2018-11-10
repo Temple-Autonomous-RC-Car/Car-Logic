@@ -34,7 +34,7 @@ def region_of_interest(img, vertices):
     formed from `vertices`. The rest of the image is set to black.
     """
     #defining a blank mask to start with
-    mask = np.zeros_like(img)
+i    mask = np.zeros_like(img)
 
     #defining a 3 channel or 1 channel color to fill the mask with depending on the input image
     if len(img.shape) > 2:
@@ -66,10 +66,16 @@ def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
     If you want to make the lines semi-transparent, think about combining
     this function with the weighted_img() function below
     """
+    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
     for line in lines:
         for x1,y1,x2,y2 in line:
-            cv2.line(img, (x1, y1), (x2, y2), color, thickness)
-
+            x1 = int(x1)
+            y1 = int(y1)
+            x2 = int(x2)
+            y2 = int(y2)
+            cv2.line(line_img, (x1, y1), (x2, y2), color, thickness)
+    ret = weighted_img(line_img, img)        
+    return ret
 def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
     """
     `img` should be the output of a Canny transform.
@@ -79,9 +85,9 @@ def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
     #if(lines.any() == None):
     #    print("No lines found.")
     #    exit()
-    line_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
-    draw_lines(line_img, lines)
-    return line_img
+    #draw_lines(line_img, lines)
+    #return line_img
+    return lines
 
 # Python 3 has support for cool math symbols.
 
@@ -96,23 +102,77 @@ def weighted_img(img, initial_img, α=0.8, β=1., λ=0.):
     """
     return cv2.addWeighted(initial_img, α, img, β, λ)
 
+def draw_avg_lines(lines, image):
+    left_line_x = []
+    left_line_y = []
+    right_line_x = []
+    right_line_y = []
+    for line in lines:
+        for x1, y1, x2, y2 in line:
+            print("(%d , %d) and (%d , %d)" % (x1,y1,x2,y2))
+            x1 = int(x1)
+            y1 = int(y1)
+            x2 = int(x2)
+            y2 = int(y2)
+            if (x1 == x2):
+                slope = 0
+            else:    
+                slope = (y2 - y1) / (x2 - x1) # <-- Calculating the slope.
+            if math.fabs(slope) < 0.5: # <-- Only consider extreme slope
+                continue
+            if slope < 0: 
+                left_line_x.extend([x1, x2])
+                left_line_y.extend([y1, y2])
+            else: # <-- Otherwise, right group.
+                right_line_x.extend([x1, x2])
+                right_line_y.extend([y1, y2])
+
+    min_y = image.shape[0] * (3/8) #<-- Just below the horizon
+    max_y = image.shape[0] # <-- The bottom of the image
+    
+    poly_left = np.poly1d(np.polyfit(
+        left_line_y,
+        left_line_x,
+        deg=1
+    ))
+
+    left_x_start = int(poly_left(max_y))
+    left_x_end = int(poly_left(min_y))
+
+    poly_right = np.poly1d(np.polyfit(
+        right_line_y,
+        right_line_x,
+        deg=1
+    ))
+
+    right_x_start = int(poly_right(max_y))
+    right_x_end = int(poly_right(min_y))
+    
+    drawn_img = draw_lines(image,[[ [left_x_start, max_y, left_x_end, min_y],
+        [right_x_start, max_y, right_x_end, min_y] ]], thickness = 20)
+    return drawn_img
+
+
 def process_frame(image):
     global first_frame
 
     gray_image = grayscale(image)
-    cv2.imwrite("test_images/gray.jpg",gray_image)
+    cv2.startWindowThread()
+    cv2.namedWindow("grayScale",cv2.WINDOW_NORMAL)
+    cv2.imshow("grayScale",gray_image)
     img_hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
     #hsv = [hue, saturation, value]
     #more accurate range for yellow since it is not strictly black, white, r, g, or b
 
     lower_blue = np.array([90,70,70])
-    upper_blue = np.array([130,255,255])
+    upper_blue = np.array([110,255,255])
 
     mask_blue = cv2.inRange(img_hsv, lower_blue, upper_blue)
     #mask_white = cv2.inRange(gray_image, 200, 255)
     #mask_yw = cv2.bitwise_or(mask_white, mask_yellow)
     mask_yw_image = cv2.bitwise_and(gray_image, mask_blue)
-    cv2.imwrite("test_images/masked_images.jpg",mask_yw_image)
+    cv2.namedWindow("maskedImage",cv2.WINDOW_NORMAL)
+    cv2.imshow("maskedImage",mask_yw_image)
     kernel_size = 5
     gauss_gray = gaussian_blur(mask_yw_image,kernel_size)
 
@@ -120,32 +180,39 @@ def process_frame(image):
     low_threshold = 50
     high_threshold = 150
     canny_edges = canny(gauss_gray,low_threshold,high_threshold)
-    
-    cv2.imwrite("test_images/canny.jpg", canny_edges)
+    cv2.namedWindow("cannyImage",cv2.WINDOW_NORMAL)
+    cv2.imshow("cannyImage",canny_edges)
     imshape = image.shape
-    lower_left = [imshape[1]/9,imshape[0]]
-    lower_right = [imshape[1]-imshape[1]/9,imshape[0]]
-    top_left = [imshape[1]/2-imshape[1]/8,imshape[0]/2+imshape[0]/10]
-    top_right = [imshape[1]/2+imshape[1]/8,imshape[0]/2+imshape[0]/10]
+    lower_left = [0,imshape[0] - imshape[0]/4]
+    lower_right = [imshape[1],imshape[0]- imshape[0]/4]
+    top_left = [0,0]
+    top_right = [imshape[1],0]
     vertices = [np.array([lower_left,top_left,top_right,lower_right],dtype=np.int32)]
     roi_image = region_of_interest(canny_edges, vertices)
-
+    cv2.namedWindow("roi", cv2.WINDOW_NORMAL)
+    cv2.imshow("roi", roi_image)
     #rho and theta are the distance and angular resolution of the grid in Hough space
     #same values as quiz
     rho = 2
     theta = np.pi/180
     #threshold is minimum number of intersections in a grid for candidate line to go to output
-    threshold = 2
+    threshold = 5
     min_line_len = 5
     max_line_gap = 5
 
-    line_image = hough_lines(roi_image, rho, theta, threshold, min_line_len, max_line_gap)
+    lines = hough_lines(roi_image, rho, theta, threshold, min_line_len, max_line_gap)
 
-    result = weighted_img(line_image, image, α=0.8, β=1., λ=0.)
+    result = draw_avg_lines(lines, image)
+    cv2.namedWindow("houghs", cv2.WINDOW_NORMAL)
+    cv2.imshow("houghs",draw_lines(image, lines))
     return result
 
 for source_img in os.listdir("test_images/"):
     print(source_img)
     image = mpimg.imread("test_images/"+source_img)
     processed = process_frame(image)
-    mpimg.imsave("test_images/annotated_"+source_img,processed)
+    cv2.namedWindow("processedImage",cv2.WINDOW_NORMAL)
+    processed = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
+    cv2.imshow("processedImage",processed)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
