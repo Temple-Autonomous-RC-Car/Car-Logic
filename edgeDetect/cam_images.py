@@ -5,35 +5,17 @@ import sys
 import numpy as np
 import math
 
-#calculate angle between current vector line and lane midpoint line
-def angle_between(image, x1, x2, y1, y2, x3, x4, y3, y4): 
-
-	slopeMid = (x2-x1)/(y2-y1)
-	slopeVect = (x3-x4)/(y3-y4)
-	angle = math.atan((slopeVect-slopeMid)/(1+(slopeVect*slopeMid)))
-	angle = math.degrees(angle)
-	print(angle)
-	#angleBetween = 3.14 - abs(angleMid- angleVect)
-	#angle = math.degrees(angleBetween)
-	print(angle)
-	draw_midline(image, x1,x2,x3,x4, y1, y2, y3, y4)
-	return angle
-
 #identify lines
 def hough_transformation(image):
 	img = image.copy()
 	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	#edges = cv2.Canny(gray,50,150,apertureSize = 3)
-	#gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	#edges = cv2.Canny(gray, 50, 150, apertureSize = 3)
 
 	lines = cv2.HoughLinesP(gray,7,np.pi/180,100,200,10)
 	for x1, y1, x2, y2 in lines[0]:
 		cv2.line(img, (x1,y1), (x2,y2), (0,0,255),5)
-	#angle_between(x1,x2,y1,y2,image)
 	for x3, y3, x4, y4 in lines[1]:
 		cv2.line(img, (x3,y3), (x4,y4), (0,0,255),5)
-	draw_midline(image, x1, x2, x3, x4, y1, y2, y3, y4)
+	draw_midline_find_angle(image, x1, x2, x3, x4, y1, y2, y3, y4)
 	img = cv2.imwrite('houghlines.jpg',img)
 	img = cv2.imread('houghlines.jpg', 0)
 	return img
@@ -79,9 +61,8 @@ def resize_image(image):
 	return resized
 
 #draw line between hough lines
-def draw_midline(image, x1, x2, x3, x4, y1, y2, y3, y4):
+def draw_midline_find_angle(image, x1, x2, x3, x4, y1, y2, y3, y4):
 	startX = int((x1+x4)/2)
-	print(startX)
 	endX = int((x2+x3)/2)
 	startY = y1
 	endY = y2
@@ -89,8 +70,7 @@ def draw_midline(image, x1, x2, x3, x4, y1, y2, y3, y4):
 	slope = (startY-endY)/(startX-endX)
 	angle = math.atan(slope)
 	angle = math.degrees(angle)
-	print("angle is")
-	print(angle)
+
 	img = cv2.line(image, (startX, startY), (endX, endY), (255,0,0),5)
 	cv2.imwrite("final.jpg", img)
 	return img
