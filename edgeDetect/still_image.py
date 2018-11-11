@@ -90,6 +90,8 @@ def hough_lines(img, rho, theta, threshold, min_line_len, max_line_gap):
     #    exit()
     #draw_lines(line_img, lines)
     #return line_img
+    if lines is None:
+        print("No lines found")
     return lines
 
 # Python 3 has support for cool math symbols.
@@ -200,15 +202,15 @@ def process_frame(image):
     #hsv = [hue, saturation, value]
     #more accurate range for yellow since it is not strictly black, white, r, g, or b
 
-    lower_blue = np.array([90,110,70])
-    upper_blue = np.array([110,255,255])
+    lower_blue = np.array([95,90,90])
+    upper_blue = np.array([105,255,255])
 
     mask_blue = cv2.inRange(img_hsv, lower_blue, upper_blue)
     #mask_white = cv2.inRange(gray_image, 200, 255)
     #mask_yw = cv2.bitwise_or(mask_white, mask_yellow)
     mask_yw_image = cv2.bitwise_and(gray_image, mask_blue)
-    #cv2.namedWindow("maskedImage",cv2.WINDOW_NORMAL)
-    #cv2.imshow("maskedImage",mask_yw_image)
+    cv2.namedWindow("maskedImage",cv2.WINDOW_NORMAL)
+    cv2.imshow("maskedImage",mask_yw_image)
     kernel_size = 5
     gauss_gray = gaussian_blur(mask_yw_image,kernel_size)
 
@@ -216,8 +218,8 @@ def process_frame(image):
     low_threshold = 50
     high_threshold = 150
     canny_edges = canny(gauss_gray,low_threshold,high_threshold)
-    #cv2.namedWindow("cannyImage",cv2.WINDOW_NORMAL)
-    #cv2.imshow("cannyImage",canny_edges)
+    cv2.namedWindow("cannyImage",cv2.WINDOW_NORMAL)
+    cv2.imshow("cannyImage",canny_edges)
     imshape = image.shape
     lower_left = [0,imshape[0]]
     lower_right = [imshape[1], imshape[0]]
@@ -225,8 +227,8 @@ def process_frame(image):
     top_right = [imshape[1]-imshape[1]/7, imshape[0]/4]
     vertices = [np.array([lower_left,top_left,top_right,lower_right],dtype=np.int32)]
     roi_image = region_of_interest(canny_edges, vertices)
-    #cv2.namedWindow("roi", cv2.WINDOW_NORMAL)
-    #cv2.imshow("roi", roi_image)
+    cv2.namedWindow("roi", cv2.WINDOW_NORMAL)
+    cv2.imshow("roi", roi_image)
     #rho and theta are the distance and angular resolution of the grid in Hough space
     #same values as quiz
     rho = 2
@@ -237,25 +239,26 @@ def process_frame(image):
     max_line_gap = 5
 
     lines = hough_lines(roi_image, rho, theta, threshold, min_line_len, max_line_gap)
-
+    if(lines is None):
+        return image
     result = draw_avg_lines(lines, image)
     #rightLine, leftLine = avgLines
     #find_midline_angle(image,rightLine, leftLine)
     
     
-    #cv2.namedWindow("houghs", cv2.WINDOW_NORMAL)
-    #cv2.imshow("houghs",draw_lines(image, lines))
+    cv2.namedWindow("houghs", cv2.WINDOW_NORMAL)
+    cv2.imshow("houghs",draw_lines(image, lines))
     return result
 
 def main():
     for source_img in os.listdir("test_images/"):
         print(source_img)
         image = mpimg.imread("test_images/"+source_img)
-        #image = process_frame(image)
-        #cv2.namedWindow("Dog", cv2.WINDOW_NORMAL)
-        #cv2.imshow("Dog", image)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
+        image = process_frame(image)
+        cv2.namedWindow("Dog", cv2.WINDOW_NORMAL)
+        cv2.imshow("Dog", image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
 if(__name__ == "__main__"):
     main()

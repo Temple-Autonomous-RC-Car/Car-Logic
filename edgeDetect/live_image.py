@@ -13,26 +13,26 @@ def run():
 def frameAnalysisThread():    
     camera = PiCamera()
     camera.framerate = 30
-    camera.resolution = (720,720)
-    rawCapture = PiRGBArray(camera, size=(720,720))
+    camera.resolution = (1280,1280)
+    rawCapture = PiRGBArray(camera, size=(1280,1280))
 
     time.sleep(0.1)
 
-    #cv2.startWindowThread()
-    #cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+    cv2.startWindowThread()
+    cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
     for frame in camera.capture_continuous(rawCapture, format="rgb", use_video_port=True):
         image = frame.array
         frame = still_image.process_frame(image)
 
-        #cv2.imshow("Frame", frame)
+        cv2.imshow("Frame", frame)
         global liveAngle 
         liveAngle = still_image.angleVar
-        #print("Live angle is %d" % (liveAngle))
+        print("Live angle is %d" % (liveAngle))
         rawCapture.truncate(0)
-       # key = cv2.waitKey(1) & 0xFF
-        #if(key == ord("q")):
-         #   break
-    #cv2.destroyAllWindows()
+        key = cv2.waitKey(1) & 0xFF
+        if(key == ord("q")):
+            break
+    cv2.destroyAllWindows()
 def main():
     run()
 if(__name__ == "__main__"):

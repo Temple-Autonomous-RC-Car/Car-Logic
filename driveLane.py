@@ -5,25 +5,25 @@ steer(0)
 drive(0)
 
 
-leftSteer = -.80
-rightSteer = .80
-centerSteer = 0
+leftSteer = -.60
+rightSteer = .60
+centerSteer = .12
 
 live_image.run()
 try:
     while(True):
-        #drive(.23)
+        drive(.28)
         angle = live_image.liveAngle
         print("Got angle of %d" % (angle))
-        if(angle > -87 and angle < 0):
+        if(angle > -88 and angle < 0):
             steer(leftSteer)
-            sleep(.5)
-        elif(angle < 87 and angle >0):
+            sleep(.2)
+        elif(angle < 88 and angle >0):
             steer(rightSteer)
-            sleep(.5)
+            sleep(.2)
         else:
             steer(0)
-            sleep(.5)
+            sleep(.2)
 except KeyboardInterrupt:
     steer(0)
     drive(0)
