@@ -9,30 +9,48 @@ c = "CENTER"
 l = "LEFT"
 r = "RIGHT"
 
-leftSteer = 1
-rightSteer = -1
+steerMax = .8
 centerSteer = 0
 
 live_image.run()
 try:
-    drive(.3)
+    drive(.28)
     while(True):
         angle = live_image.liveAngle
         botOfLine = live_image.liveLine
+       # if(botOfLine == "NONE"):
+       #     drive(-1)
+       #     steer(0)
+       #     sleep(1)
+       #     drive(0)
+       #     exit()
         #print("Got angle of %d" % (angle))
-        if(angle > -87 and angle < 0):
+        if(angle > -88 and angle < 0):
+            #drive(.28)
+            if angle > -60.0:
+                angle = -60.0
+            percent = -60.0 /angle
+            steerVal= percent * steerMax
             #drive(.26)
-            if(botOfLine == c or botOfLine == l): 
-                steer(leftSteer)
-            elif(botOfLine == r):
-                steer(rightSteer)
+            if(botOfLine == r): 
+                steer(-steerVal)
+            elif(botOfLine == l):
+                steer(steerVal)
+            elif(botOfLine == c):
+                steer(steerVal/2)
             #sleep(.2)
-        elif(angle < 87 and angle >0):
-            #drive(.26)
-            if(botOfLine == l): 
-                steer(leftSteer)
-            elif(botOfLine == c or botOfLine == r):
-                steer(rightSteer)
+        elif(angle < 88 and angle >0):
+            #drive(.28)
+            if(angle < 60.0):
+                angle = 60.0
+            percent = 60.0/angle
+            steerVal= percent * steerMax
+            if(botOfLine == r): 
+                steer(-steerVal)
+            elif(botOfLine == l):
+                steer(steerVal)
+            elif(botOfLine == c):
+                steer(steerVal/2)
             #sleep(.2)
         else:
             steer(centerSteer)
@@ -41,4 +59,6 @@ try:
 except KeyboardInterrupt:
     steer(0)
     drive(-1)
+    sleep(1)
+    drive(0)
     exit()

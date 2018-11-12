@@ -55,7 +55,7 @@ def region_of_interest(img, vertices):
     return masked_image
 
 
-def draw_lines(img, lines, color=[0, 0, 255], thickness=2):
+def draw_lines(img, lines, color=[255, 0, 0], thickness=2):
     """
     NOTE: this is the function you might want to use as a starting point once you want to
     average/extrapolate the line segments you detect to map out the full
@@ -259,14 +259,14 @@ def process_frame(image):
     theta = np.pi/180
     #threshold is minimum number of intersections in a grid for candidate line to go to output
     threshold = 40
-    min_line_len =5
-    max_line_gap = 2
+    min_line_len =1
+    max_line_gap = 1
 
     lines = hough_lines(canny_edges, rho, theta, threshold, min_line_len, max_line_gap)
     if(lines is None):
         return image
-    #esult = draw_lines(image, lines, [0,0,255], thickness = 5)
-    result = draw_avg_lines(lines, image)
+    result = draw_lines(image, lines, [0,0,255], thickness = 5)
+    esult = draw_avg_lines(lines, image)
     #rightLine, leftLine = avgLines
     #find_midline_angle(image,rightLine, leftLine)
     
