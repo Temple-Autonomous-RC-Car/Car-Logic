@@ -6,6 +6,7 @@ import time
 import struct
 import select
 import subprocess
+sys.path.append('..')
 import servoController.inputController as inControl
 
 inControl.steer(0)
@@ -20,6 +21,7 @@ def empty_socket(sock):
 
 #loop to mannage connected socket input
 def on_new_client(clientsocket,addr):
+    counter = 0
     while True:
         try:
             size = struct.unpack("i", clientsocket.recv(struct.calcsize("i")))[0]
@@ -32,7 +34,9 @@ def on_new_client(clientsocket,addr):
                     break
                 data += msg.decode()
             print(data)
-            inControl.drive(.26)
+            counter+= 1
+            if(counter > 10):
+                inControl.drive(.255)
         except:
             inControl.stop()
             #clientsocket.close()
@@ -44,6 +48,10 @@ def on_new_client(clientsocket,addr):
            amt = float(words[1])
            inControl.steer(amt)
 
+        if "speed" in data:
+            words = data.split()
+            amt = float(words[1])
+            inControl.drive(amt)
 
         #time.sleep(0.1)
     clientsocket.close()
