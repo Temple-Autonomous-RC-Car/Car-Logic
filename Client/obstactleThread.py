@@ -8,9 +8,10 @@ import math
 import numpy as np
 
 THRESH = 2.0
-stopped = True
-distances = [300,300,300]
+#stopped = True
+
 def main():
+    distances = [300,300,300]
     global stopped
     pi = pigpio.pi()
     sonar = prox.ranger(pi, 23, 24)
@@ -26,7 +27,7 @@ def main():
             stopCar()
         else:
             stopped = False
-            inControl.drive(.26)
+            #inControl.drive(.26)
         
     sonar.cancel()
     pi.stop()
@@ -34,7 +35,7 @@ def main():
 
 def stopCar():
     global stopped
-    print("Stopped")
+    #print("Stopped")
     if(stopped == False):
         inControl.drive(-1)
         time.sleep(0.3)

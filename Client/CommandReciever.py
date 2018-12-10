@@ -8,7 +8,14 @@ import functools
 import traceback
 sys.path.append('..')
 import servoController.inputController as inControl
+import sensors.proximitySensor as prox
+import pigpio
 import time
+import numpy as np
+
+
+Stopped = True
+
 @functools.total_ordering
 class CommandEntry(object):
     """
@@ -34,15 +41,42 @@ class CommandEntry(object):
                 return True
         return False
 
-
+def obstacleThread(q):
+    THRESH = 2.0
+    distances = [300,300,300]
+    pi = pigpio.pi()
+    sonar = prox.ranger(pi, 23, 24)
+    t = threading.currentThread()
+    localStopped = False
+    while getattr(t, "do_run", True):
+        try:
+            distances[2] = distances[1]
+            distances[1] = distances[0]
+            distance = (.0343 * sonar.read()) / 2
+            distances[0] = distance
+            time.sleep(0.03)
+            value = (abs(distances[0] - distances[1]) < THRESH) & (abs(distances[2] - distances[1]) < THRESH) & (abs(distances[0] - distances[2]) < THRESH)
+            if(value & (np.mean(distances)<50)):
+                entry = CommandEntry(str(1),str(time.time()), "drive", str(-1))
+                q.put(entry)
+                localStopped = True
+            elif(localStopped):
+                localStopped = False
+                entry = CommandEntry(str(1),str(time.time()), "drive", str(.28))
+                q.put(entry)
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            break
 
 #loop to mannage connected socket input
 def on_new_client(clientsocket,addr, q):
     print("Socket recv starting.")
     t = threading.currentThread()
-    clientsocket.settimeout(20.0)
+    clientsocket.settimeout(120.0)
     while getattr(t, "do_run", True):
         try:
+            dumpFlag = getattr(t, "dump_commands", False)
             inc = clientsocket.recv(struct.calcsize("i"))
             if len(inc) == 0:
                 print("Socket closed")
@@ -67,7 +101,8 @@ def on_new_client(clientsocket,addr, q):
             Stop will make the car sleep for 3 seconds.
             '''
             words = data.split()
-            q.put(CommandEntry(words[0],words[1],words[2],words[3]))
+            if(not dumpFlag):
+                q.put(CommandEntry(words[0],words[1],words[2],words[3]))
         except socket.timeout:
             print("Socket closed")
             clientsocket.close()
@@ -80,7 +115,7 @@ def on_new_client(clientsocket,addr, q):
     print("Socket recv closing.")
     clientsocket.close()
 
-def socketAccept(q):
+def socketAccept(q, worker_list):
     
     #listen for an allow 5 connections
     #created and bind socket
@@ -100,6 +135,7 @@ def socketAccept(q):
             #pass newly connected socket to its own thread
             newThread = threading.Thread(target=on_new_client,args=(c,addr, q))
             threads.append(newThread)
+            worker_list.append(newThread)
             newThread.start()
         except socket.timeout:
             continue
@@ -113,67 +149,99 @@ def socketAccept(q):
             thread.do_run = False
             thread.join()
 
-def doCommand(cEntry, q):
+def doCommand(cEntry, q, workerList):
+    global Stopped
     HARD_TURN = 1
-    WAIT_AMT = 1.8
+    WAIT_AMT = 2.1
     #bits = cString.split()
     """
     <priority> <timestamp> <steer|drive|stop> <amt>
     """
     command = cEntry.command
     amt = float(cEntry.amount)
+    print("Command is %s amount is %.2f"%(command,amt))
     if(command == "steer"):
         inControl.steer(amt)
     elif(command == "drive"):
+
+        if(amt<=0 and Stopped == True):
+            amt = 0
+        elif(amt<=0 and Stopped == False):
+            Stopped = True
+        else:
+            Stopped = False
+        print("Amount %f" % amt)
         inControl.drive(amt)
+        
     elif(command == "stop"):
         inControl.stop()
         time.sleep(amt)
     elif(command =="stopright"):
+        Stopped = True
+        signalDump(workerList, True)
         inControl.drive(-1) #TODO
         time.sleep(amt)
         inControl.steer(HARD_TURN * -1)
         inControl.drive(.28)
         time.sleep(WAIT_AMT)
         inControl.steer(0)
-        time.sleep(.3)
+        signalDump(workerList, False)
+        Stopped = False
+        #time.sleep(.3)
     elif(command =="stopleft"):
+        Stopped = True
+        signalDump(workerList, True)
         inControl.drive(-1) #TODO
         time.sleep(amt)
         inControl.steer(HARD_TURN * 1)
-        inControl.drive(.28)
+        inControl.drive(.3)
         time.sleep(WAIT_AMT)
+        #inControl.drive(.26)
         inControl.steer(0)
-        time.sleep(.3)
-
+        signalDump(workerList, False)
+        inControl.drive(0)
+        time.sleep(.6)
+        inControl.drive(.28)
+        #time.sleep(.3)
+        Stopped = False
     elif(command =="stopcenter"):
+        Stopped=True
         #ts0=cEntry.timestamp
-
+        signalDump(workerList, True)
         inControl.drive(-1) #TODO
         time.sleep(amt)
         inControl.drive(.28)
         inControl.steer(0)
-        time.sleep(1)
-
+        #time.sleep(1)
+        signalDump(workerList, False)
         #ts1 = time.time()
+        Stopped=False
         
     else:
         print("Command not recognized")
-    
-    
+def signalDump(threads, boolean):
+    for thread in threads:
+        thread.dump_commands = boolean
+        
+
 def main():
     q = queue.PriorityQueue()
-    receiverThread = threading.Thread(target = socketAccept, args=(q,))
+    workerList = []
+    receiverThread = threading.Thread(target = socketAccept, args=(q,workerList))
     receiverThread.start()
+    obsThread = threading.Thread(target = obstacleThread, args=(q,))
+    obsThread.start()
+    workerList.append(obsThread)
     while True:
         try:
             value = q.get(True, 0.05)
-            doCommand(value,q)
+            doCommand(value,q, workerList)
         except queue.Empty:
             continue
         except KeyboardInterrupt:
             inControl.stop()
             receiverThread.do_run = False
+            obsThread.do_run = False
             receiverThread.join()
             exit()
         except Exception as e:
@@ -181,7 +249,9 @@ def main():
             print(traceback.format_exc())
             inControl.stop()
             receiverThread.do_run = False
+            obsThread.do_run = False
             receiverThread.join()
+            obsThread.join()
             exit()
 if(__name__ == "__main__"):
     main()

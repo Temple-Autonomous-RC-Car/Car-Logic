@@ -1,9 +1,9 @@
 import edgeDetect.live_image as live_image
 from servoController.inputController import drive, steer, stop
 from time import sleep
+from simple_pid import PID
 steer(0)
 drive(0)
-
 
 c = "CENTER"
 l = "LEFT"
@@ -14,7 +14,7 @@ centerSteer = 0
 
 live_image.run()
 try:
-    drive(.28)
+    drive(.26)
     while(True):
         angle = live_image.liveAngle
         botOfLine = live_image.liveLine

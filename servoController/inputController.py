@@ -9,9 +9,9 @@ import sys
 from adafruit_pca9685 import PCA9685
 from adafruit_motor import servo
 
-STEERING_MAX_POS = 60
-STEERING_ZERO = 50
-STEERING_MAX_NEG = 40
+STEERING_MAX_POS = 68
+STEERING_ZERO = 48
+STEERING_MAX_NEG = 28
 
 THROTTLE_SCALE = 0.5
 
@@ -26,10 +26,18 @@ def stop():
     motor.throttle = 0
 
 def drive(amount):
+    if(amount > 1):
+        amount = 1
+    if(amount < -1):
+        amount = -1
     motor.throttle = amount * THROTTLE_SCALE
 
 def steer(amount):
-    steer = STEERING_ZERO + amount * 10
+    if(amount > 1):
+        amount =1
+    if(amount < -1):
+        amount =-1
+    steer = STEERING_ZERO + amount * 20
     servo.angle = steer
 def strongStop():
     motor.throttle = 0
@@ -40,7 +48,7 @@ def main():
         print("Usage: <drive|steer> <throttle amount| steering amount>")
     elif(sys.argv[1] == 'drive'):
         driveAmt = float(sys.argv[2])
-        if(driveAmt >= -1 and driveAmt <= 1):
+        if(driveAmt >= -2 and driveAmt <= 2):
             drive(driveAmt)
             sleep(1)
             stop()
@@ -48,7 +56,7 @@ def main():
             print("Usage: <drive|steer> <throttle amount| steering amount>")
     elif(sys.argv[1] == 'steer'):
         steerAmt = float(sys.argv[2])
-        if(steerAmt >= -1 and steerAmt <= 1):
+        if(steerAmt >= -2 and steerAmt <= 2):
             steer(steerAmt)
             sleep(2)
             steer(0)

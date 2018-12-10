@@ -2,7 +2,7 @@ import socket
 import sys
 
 #IP address of the socket server goes here
-TCP_IP = '10.42.0.1'
+TCP_IP = '192.168.137.156'
 #Poet reserved for data
 TCP_PORT = 12346
 

@@ -9,21 +9,21 @@ def medianFilt(val):
     arr[9] = val
     temp = arr.copy()
     temp.sort()
-    print("Array is " + str(arr))
+    #print("Array is " + str(arr))
     return temp[5]
 
 getDistance()
 getDistance()
 steer(-.22)
-drive(0.38)
+drive(0.28)
 while(True):
     val = getDistance()
     val = medianFilt(val)
     print("Distance is: %.2f" % val)
-    if(val < 85.0):
+    if(val < 60.0):
         drive(-1)
-        #sleep(1)
-        #stop()
+        sleep(1)
+        stop()
         break
         print("Stopped")
 print("Done")

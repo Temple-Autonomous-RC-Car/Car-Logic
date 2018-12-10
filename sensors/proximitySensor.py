@@ -1,87 +1,114 @@
-#!/usr/bin/python
-#+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#|R|a|s|p|b|e|r|r|y|P|i|-|S|p|y|.|c|o|.|u|k|
-#+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-#
-# ultrasonic_1.py
-# Measure distance using an ultrasonic module
-#
-# Ultrasonic related posts:
-# http://www.raspberrypi-spy.co.uk/tag/ultrasonic/
-#
-# Author : Matt Hawkins
-# Date   : 16/10/2016
-#
-# Modified by : Aaron Geller
-# Date        : 21/10/2018
-#
-# -----------------------
+#!/usr/bin/env python
 
-# Import required Python libraries
-from __future__ import print_function
-from sensors.MPU6050 import MPU6050
 import time
-import RPi.GPIO as GPIO
 
-sensor = MPU6050(0x68)
+import pigpio
 
+class ranger:
+   """
+   This class encapsulates a type of acoustic ranger.  In particular
+   the type of ranger with separate trigger and echo pins.
 
-# Use BCM GPIO references
-# instead of physical pin numbers
-GPIO.setmode(GPIO.BCM)
+   A pulse on the trigger initiates the sonar ping and shortly
+   afterwards a sonar pulse is transmitted and the echo pin
+   goes high.  The echo pins stays high until a sonar echo is
+   received (or the response times-out).  The time between
+   the high and low edges indicates the sonar round trip time.
+   """
 
-# Define GPIO to use on Pi
-GPIO_TRIGGER = 23
-GPIO_ECHO    = 24
+   def __init__(self, pi, trigger, echo):
+      """
+      The class is instantiated with the Pi to use and the
+      gpios connected to the trigger and echo pins.
+      """
+      self.pi    = pi
+      self._trig = trigger
+      self._echo = echo
 
-# Speed of sound in cm/s at temperature
-temperature = sensor.get_temp()
-speedSound = 33100 + (0.6*temperature)
+      self._ping = False
+      self._high = None
+      self._time = None
 
-#print("Ultrasonic Measurement")
-#print("Speed of sound is",speedSound/100,"m/s at ",temperature,"deg")
+      self._triggered = False
 
-# Set pins as output and input
-GPIO.setup(GPIO_TRIGGER,GPIO.OUT)  # Trigger
-GPIO.setup(GPIO_ECHO,GPIO.IN)      # Echo
+      self._trig_mode = pi.get_mode(self._trig)
+      self._echo_mode = pi.get_mode(self._echo)
 
-def getDistance():
-    try:
-         # Set trigger to False (Low)
-        GPIO.output(GPIO_TRIGGER, False)
+      pi.set_mode(self._trig, pigpio.OUTPUT)
+      pi.set_mode(self._echo, pigpio.INPUT)
 
-        # Allow module to settle
-        time.sleep(0.03)
+      self._cb = pi.callback(self._trig, pigpio.EITHER_EDGE, self._cbf)
+      self._cb = pi.callback(self._echo, pigpio.EITHER_EDGE, self._cbf)
 
-        # Send 10us pulse to trigger
-        GPIO.output(GPIO_TRIGGER, True)
-        # Wait 10us
-        time.sleep(0.00001)
-        GPIO.output(GPIO_TRIGGER, False)
-        start = time.time()
+      self._inited = True
 
-        while GPIO.input(GPIO_ECHO)==0:
-            start = time.time()
+   def _cbf(self, gpio, level, tick):
+      if gpio == self._trig:
+         if level == 0: # trigger sent
+            self._triggered = True
+            self._high = None
+      else:
+         if self._triggered:
+            if level == 1:
+               self._high = tick
+            else:
+               if self._high is not None:
+                  self._time = tick - self._high
+                  self._high = None
+                  self._ping = True
 
-        while GPIO.input(GPIO_ECHO)==1:
-            stop = time.time()
+   def read(self):
+      """
+      Triggers a reading.  The returned reading is the number
+      of microseconds for the sonar round-trip.
 
-        # Calculate pulse length
-        elapsed = stop-start
+      round trip cms = round trip time / 1000000.0 * 34030
+      """
+      if self._inited:
+         self._ping = False
+         self.pi.gpio_trigger(self._trig)
+         start = time.time()
+         while not self._ping:
+            if (time.time()-start) > 5.0:
+               return 20000
+            time.sleep(0.001)
+         return self._time
+      else:
+         return None
 
-            # Distance pulse travelled in that time is time
-        # multiplied by the speed of sound (cm/s)
-        distance = elapsed * speedSound
+   def cancel(self):
+      """
+      Cancels the ranger and returns the gpios to their
+      original mode.
+      """
+      if self._inited:
+         self._inited = False
+         self._cb.cancel()
+         self.pi.set_mode(self._trig, self._trig_mode)
+         self.pi.set_mode(self._echo, self._echo_mode)
 
-        # That was the distance there and back so halve the value
-        distance = distance / 2
+if __name__ == "__main__":
 
-        #print("Distance : {0:5.1f}".format(distance))
+   import time
 
-        return distance
-    except KeyboardInterrupt:
-        # Reset GPIO settings
-        GPIO.cleanup()
-def cleanUp():
-    GPIO.cleanup()
-        
+   import pigpio
+
+   import proximitySensor
+
+   pi = pigpio.pi()
+
+   sonar = proximitySensor.ranger(pi, 23, 24)
+
+   end = time.time() + 600.0
+
+   r = 1
+   while time.time() < end:
+
+      print("{} {}".format(r, (.0343 * sonar.read()) /2))
+      r += 1
+      time.sleep(0.03)
+
+   sonar.cancel()
+
+   pi.stop()
+
